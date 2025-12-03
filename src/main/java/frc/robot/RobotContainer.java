@@ -7,6 +7,7 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import frc.robot.SubSystem.Drive;
 import frc.robot.SubSystem.ObjectSim;
+import frc.robot.SubSystem.TrajectoryFollower;
 import frc.robot.SubSystem.Vision;
 import frc.robot.SubSystem.BangBangSub;
 import frc.robot.command.Auto.AutonomousCommand;
@@ -20,6 +21,7 @@ public class RobotContainer {
   private final Drive driveSubsystem = new Drive(object);
   private final Vision vision = new Vision(driveSubsystem,Constants.targetArea);
   public final BangBangSub baby = new BangBangSub(vision,driveSubsystem,object);
+  private final TrajectoryFollower traj = new TrajectoryFollower(driveSubsystem);
   
 
 
@@ -42,9 +44,9 @@ public class RobotContainer {
     CommandScheduler.getInstance().registerSubsystem(driveSubsystem);
 
     // Initialize Loc command with drive subsystem and joystick
-    auto = new AutonomousCommand(driveSubsystem,vision,Constants.targetArea);
+    auto = new AutonomousCommand(driveSubsystem,vision,Constants.targetArea,baby);
 
-    locCommand = new Loc(driveSubsystem,joyDeliciu,baby,vision,JoyDelicioso);
+    locCommand = new Loc(driveSubsystem,joyDeliciu,baby,vision,JoyDelicioso,traj);
 
     // Set default command
     driveSubsystem.setDefaultCommand(locCommand);

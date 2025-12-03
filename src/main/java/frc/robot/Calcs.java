@@ -18,8 +18,8 @@ public class Calcs {
     }
 
     public static DriveSpeeds calculateAnalogDrive(Joystick joyDeliciu, double B_Speed) {
-        double X = joyDeliciu.getX();
-        double Y = -joyDeliciu.getY();
+        double X = -joyDeliciu.getX();
+        double Y = joyDeliciu.getY();
         
 
         double magnitude = Math.hypot(X, Y);
@@ -49,7 +49,7 @@ public class Calcs {
 
     public static DriveSpeeds calculateAnalogDrive2(Joystick joyDeliciu, double B_Speed){
         double X1 = joyDeliciu.getRawAxis(4);
-        double Y2 = joyDeliciu.getRawAxis(5);
+        double Y2 = -joyDeliciu.getRawAxis(5);
         
         double magnitude2 = Math.hypot(X1, Y2);
         magnitude2 = Math.max(-1, Math.min(1, magnitude2));
@@ -98,14 +98,14 @@ public class Calcs {
 
     public static DriveSpeeds calculatePovDrive(Joystick Joydeliciu, double B_Speed) {
         switch (Joydeliciu.getPOV()) {
-            case 0: return new DriveSpeeds(0.5, 0.5);
-            case 45: return new DriveSpeeds(0.5, 0.25);
-            case 90: return new DriveSpeeds(0.5, -0.5);
-            case 135: return new DriveSpeeds(-0.5, -0.25);
-            case 180: return new DriveSpeeds(-0.5, -0.5);
-            case 225: return new DriveSpeeds(-0.25, -0.5);
-            case 270: return new DriveSpeeds(-0.5, 0.5);
-            case 315: return new DriveSpeeds(-0.25, 0.5);
+            case 0: return new DriveSpeeds(-0.5, -0.5);
+            case 45: return new DriveSpeeds(-0.5, -0.25);
+            case 90: return new DriveSpeeds(-0.5, 0.5);
+            case 135: return new DriveSpeeds(0.5, 0.25);
+            case 180: return new DriveSpeeds(0.5, 0.5);
+            case 225: return new DriveSpeeds(0.25, 0.5);
+            case 270: return new DriveSpeeds(0.5, -0.5);
+            case 315: return new DriveSpeeds(0.25, -0.5);
             default: return new DriveSpeeds(0, 0);
         }
     }

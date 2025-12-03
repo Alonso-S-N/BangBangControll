@@ -3,8 +3,12 @@
   import com.ctre.phoenix.motorcontrol.InvertType;
   import com.ctre.phoenix.motorcontrol.NeutralMode;
   import com.ctre.phoenix.motorcontrol.can.WPI_VictorSPX;
-  import frc.robot.Constants;
-import pabeles.concurrency.ConcurrencyOps.NewInstance;
+
+import frc.robot.Calcs.DriveSpeeds;
+import frc.robot.Constants;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -12,13 +16,11 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
-import edu.wpi.first.math.kinematics.Odometry3d;
+import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.networktables.NetworkTableEntry;
   import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.Publisher;
-import edu.wpi.first.networktables.StructArrayPublisher;
-import edu.wpi.first.networktables.StructPublisher;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
   import edu.wpi.first.wpilibj.Encoder;
   import edu.wpi.first.wpilibj.RobotBase;
@@ -26,23 +28,14 @@ import edu.wpi.first.wpilibj.ADXRS450_Gyro;
   import edu.wpi.first.wpilibj.smartdashboard.Field2d;
   import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
   import edu.wpi.first.wpilibj2.command.SubsystemBase;
-  import edu.wpi.first.wpilibj.drive.DifferentialDrive;
   import edu.wpi.first.wpilibj.simulation.ADXRS450_GyroSim;
   import edu.wpi.first.wpilibj.simulation.EncoderSim;
   import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
-  import edu.wpi.first.math.system.plant.DCMotor;
   import org.ironmaple.simulation.SimulatedArena;
-import org.ironmaple.simulation.seasonspecific.crescendo2024.Arena2024Crescendo;
-import org.ironmaple.simulation.seasonspecific.reefscape2025.Arena2025Reefscape;
-import edu.wpi.first.math.geometry.Pose3d;
-import org.ironmaple.simulation.SimulatedArena;
-import org.ironmaple.simulation.drivesims.AbstractDriveTrainSimulation;
-import org.ironmaple.simulation.drivesims.SwerveDriveSimulation;
-import org.ironmaple.simulation.motorsims.SimulatedBattery;
 import org.ironmaple.simulation.seasonspecific.reefscape2025.Arena2025Reefscape;
 import org.ironmaple.simulation.seasonspecific.reefscape2025.ReefscapeAlgaeOnField;
 import org.ironmaple.simulation.seasonspecific.reefscape2025.ReefscapeCoralOnField;
-import org.ironmaple.simulation.seasonspecific.reefscape2025.ReefscapeProcessorSimulation;
+
 import org.littletonrobotics.junction.Logger;
 
 
@@ -53,27 +46,39 @@ import org.littletonrobotics.junction.Logger;
     public EncoderSim rightEncoderSim;
     public ADXRS450_GyroSim gyroSim;
     public DifferentialDrivetrainSim driveSim;
+    public DifferentialDrivePoseEstimator poseEstimator;
     private double _debugX = 0.0;
     private double _lastTime = 0.0;
-    private double simYaw = 0.0;
+
+    public static final double kTrackwidthMeters = 0.6;
+    public final DifferentialDriveKinematics m_kinematics = 
+    new DifferentialDriveKinematics(kTrackwidthMeters); 
+
+    public final SimpleMotorFeedforward m_feedforward = 
+    new SimpleMotorFeedforward(0.18, 2.7, 0.4); // Valores de Exemplo (TESTAR!!!!!)
+    public final PIDController m_leftController = new PIDController(0.008, 0.0, 0.0);
+    public final PIDController m_rightController = new PIDController(0.008, 0.0, 0.0);
     private final  Arena2025Reefscape arena = new Arena2025Reefscape();
 
     private final Pose3d poseA = new Pose3d();
     private final Pose3d poseB = new Pose3d();
-    
+
     private final WPI_VictorSPX m_leftLeader  = new WPI_VictorSPX(Constants.LMot);
     private final WPI_VictorSPX m_rightLeader = new WPI_VictorSPX(Constants.RMot);
     private final WPI_VictorSPX m_leftFollower  = new WPI_VictorSPX(Constants.LMot2);
     private final WPI_VictorSPX m_rightFollower = new WPI_VictorSPX(Constants.RMot2);
     
     public final Encoder leftEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X);
-    private final Encoder rightEncoder = new Encoder(6, 7, true, Encoder.EncodingType.k4X);
+    public final Encoder rightEncoder = new Encoder(6, 7, true, Encoder.EncodingType.k4X);
     private final ADXRS450_Gyro gyro = new ADXRS450_Gyro();
     private BangBangSub braceta = null;
     private ObjectSim object;
+    private double simLeftVolts;
+    private double simRightVolts;
     
         private final double diametroRoda = 0.06; // 6 cm
         private final DifferentialDriveOdometry odometry;
+     
           public Drive(ObjectSim object) {
             this.object = object;
            resetEncoders();
@@ -84,6 +89,15 @@ import org.littletonrobotics.junction.Logger;
             leftEncoder.getDistance(),
             rightEncoder.getDistance()
         );
+
+        this.poseEstimator = new DifferentialDrivePoseEstimator(
+    m_kinematics, 
+    getHeading(), 
+    leftEncoder.getDistance(), 
+    rightEncoder.getDistance(),
+    new Pose2d() // Pose inicial (0, 0)
+);
+
     
         SmartDashboard.putData("Field", field);
         poseEntry = NetworkTableInstance.getDefault()
@@ -174,8 +188,15 @@ import org.littletonrobotics.junction.Logger;
       }
      }
     }
-  }
 
+    poseEstimator.update(
+        getHeading(), 
+        leftEncoder.getDistance(), 
+        rightEncoder.getDistance()
+    );
+
+    Pose2d EstimatedPose= poseEstimator.getEstimatedPosition();
+  }
 
   public void startProjectileLaunch() {
     if (!RobotBase.isSimulation()) {
@@ -211,6 +232,10 @@ import org.littletonrobotics.junction.Logger;
       return odometry.getPoseMeters();
     }
 
+    public DifferentialDriveWheelSpeeds getWheelSpeeds() {
+    return new DifferentialDriveWheelSpeeds(leftEncoder.getRate(), rightEncoder.getRate());
+}
+
     public void resetOdometry(Pose2d pose) {
       resetEncoders();
       gyro.reset(); 
@@ -221,6 +246,41 @@ import org.littletonrobotics.junction.Logger;
       leftEncoder.reset();
       rightEncoder.reset();
     }
+
+    public void addVisionMeasurement(Pose2d visionPose, double timestamp) {
+      poseEstimator.addVisionMeasurement(visionPose, timestamp);
+  }
+
+    public DriveSpeeds tankDriveVolts(double leftVelocitySetpoint, double rightVelocitySetpoint) {
+
+      // 1) Feedforward gera a tensão base
+      double leftFF = m_feedforward.calculate(leftVelocitySetpoint);
+      double rightFF = m_feedforward.calculate(rightVelocitySetpoint);
+  
+      // 2) PID calcula a correção com base no erro
+      double leftPID = m_leftController.calculate(
+          getWheelSpeeds().leftMetersPerSecond,
+          leftVelocitySetpoint
+      );
+      double rightPID = m_rightController.calculate(
+          getWheelSpeeds().rightMetersPerSecond,
+          rightVelocitySetpoint
+      );
+  
+      // 3) Soma final -> voltagem real enviada ao motor
+      double leftVolts = leftFF + leftPID;
+      double rightVolts = rightFF + rightPID;
+  
+      simLeftVolts = leftVolts;
+      simRightVolts = rightVolts;
+
+      m_leftLeader.setVoltage(leftVolts);
+      m_rightLeader.setVoltage(rightVolts);
+
+      return new DriveSpeeds(leftVolts/12, rightVolts/12);
+
+  }
+
 
     public void reqDrive() {
       resetOdometry(getPose());
@@ -237,6 +297,10 @@ import org.littletonrobotics.junction.Logger;
       m_leftFollower.setNeutralMode(NeutralMode.Brake);
       m_rightLeader.setNeutralMode(NeutralMode.Brake);
       m_rightFollower.setNeutralMode(NeutralMode.Brake);
+      m_leftLeader.configOpenloopRamp(0.5);
+      m_leftFollower.configOpenloopRamp(0.5);
+      m_rightLeader.configOpenloopRamp(0.5);
+      m_rightFollower.configOpenloopRamp(0.5);
 
       double distancePerPulse = (Math.PI * diametroRoda) / 2048;
       leftEncoder.setDistancePerPulse(distancePerPulse);

@@ -44,7 +44,11 @@ public class ObjectSim extends SubsystemBase {
     }
     Translation3d fieldRelativeVelocity = robotRelativeVelocity.rotateBy(robotRotation);
     
-    this.objectPose = startPose;
+    this.objectPose = new Pose3d(
+      startPose.getTranslation(),
+      startPose.getRotation()
+  );
+  
     this.velocity = fieldRelativeVelocity; 
     this.isStatic = false;
     isHeld = false;

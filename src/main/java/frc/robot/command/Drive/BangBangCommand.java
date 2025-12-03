@@ -1,158 +1,148 @@
-// Copyright (c) FIRST and other WPILib contributors.
-// Open Source Software; you can modify and/or share it under the terms of
-// the WPILib BSD license file in the root directory of this project.
-
 package frc.robot.command.Drive;
 
-import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.SubSystem.BangBangSub;
 import frc.robot.SubSystem.Vision;
 import frc.robot.Constants;
-import com.ctre.phoenix.motorcontrol.can.VictorSPX;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
 
 public class BangBangCommand extends Command {
-  private final BangBangSub PetecoPeteco;
-  private Boolean YPressed = false;
-  private boolean indoPraCima = false;
-  private boolean ParouOBracin = false;
-  private boolean Xpressed = false;
-  private Vision vision;
-  
-    private Joystick joyDelicioso = new Joystick(Constants.JoyDelicioso);
-    
-      public BangBangCommand(BangBangSub PetecoPeteco,Joystick joyDelicioso,Vision vision) {
-       this.PetecoPeteco = PetecoPeteco;
-       this.vision = vision;
-       this.joyDelicioso = joyDelicioso;
-     addRequirements(PetecoPeteco);
+
+  private final BangBangSub shooter;
+  private final Vision vision;
+  private final Joystick joy;
+
+  private boolean yMode = false;
+  private boolean xMode = false;
+  private boolean bracetaTravado = false;
+
+  public BangBangCommand(BangBangSub shooter, Joystick joy, Vision vision) {
+    this.shooter = shooter;
+    this.vision = vision;
+    this.joy = joy;
+    addRequirements(shooter);
+  }
+
+  @Override
+  public void initialize() {}
+
+  /* ===========================
+     SEÇÃO DE LEITURA DE BOTÕES
+     =========================== */
+
+  private void handleModeButtons() {
+
+    // Y → BangBang manual fixo em 3000 RPM
+    if (joy.getRawButtonPressed(Constants.y)) {
+      yMode = true;
+      xMode = false;
     }
-  
-  
-    @Override
-    public void initialize() {
+
+    // X → AutoShooter baseado no distance-to-tag
+    if (joy.getRawButtonPressed(Constants.x)) {
+      xMode = true;
+      yMode = false;
     }
-  
-    public void mexerBracinSlk(){
-    if (joyDelicioso.getRawAxis(Constants.RT) > 0.1){
-      PetecoPeteco.MexePruLado();
-    } else if (joyDelicioso.getRawAxis(Constants.LT) > 0.1){
-      PetecoPeteco.MexePruOutro();
+
+    // B → trava/destrava e força Stop
+    if (joy.getRawButtonPressed(Constants.b)) {
+      bracetaTravado = !bracetaTravado;
+      shooter.StopShooter();
+      shooter.ResetPetecoPeteco();
+      yMode = false;
+      xMode = false;
+    }
+
+  }
+
+  /* ===========================
+        CONTROLE DO INTAKE
+     =========================== */
+  private void controleIntake() {
+    if (joy.getRawButton(Constants.RB)) {
+      shooter.Pegar();
+    } else if (joy.getRawButton(Constants.LB)) {
+      shooter.Cuspir();
     } else {
-      PetecoPeteco.StopBraceta();
-    }
-     //if (joyDelicioso.getRawButton(Constants.RB)){
-       //braceta.MexePru(ANgulinQnoisQuer);
-     // } else if (joyDelicioso.getRawButton(Constants.LB)){
-       // braceta.MexePru(ANgulinQnoisQuer2);
-      //}  
-    }  
-    public void mexerIntakeSlk(){
-      if (joyDelicioso.getRawButton(Constants.RB)){
-        PetecoPeteco.Pegar();
-      } else if (joyDelicioso.getRawButton(Constants.LB)){
-        PetecoPeteco.Cuspir();
-      } else {
-        PetecoPeteco.stopExtensor();
-      }
-    }
-
-    public void PerseguirEAtirar(){
-      if (vision.hasTarget()){
-        if (vision.getTa() >= Constants.targetArea - vision.hysteresis){
-          PetecoPeteco.autoShooter();
-        } else {
-          PetecoPeteco.StopBraceta();
-        }
-      }
-    }
-  
-    public void MexerComPIDSLK(){
-     // if (YPressed){
-       // braceta.AcertaOCantoAi(braceta.posSubino);  
-       // if (braceta.ArmController.atSetpoint()){
-       // braceta.MoveTo(braceta.posIntakeExtend);
-     // }        
-     // } else if (Xpressed){ 
-       // braceta.MoveTo(braceta.posIntakeRetract);
-       // if (braceta.ExtensorController.atSetpoint()){
-       // braceta.AcertaOCantoAi(braceta.posDesceno);
-    }
- // }
-//}
-
-  public void resetBangBang(){
-    if (joyDelicioso.getPOV() == 0){
-    PetecoPeteco.ResetPetecoPeteco();
+      shooter.stopExtensor();
     }
   }
 
-   public void ButtonYgetPressed(){ 
-    if (joyDelicioso.getRawButtonPressed(Constants.y)){
-       YPressed = true; 
-        Xpressed = false;
-        double rpm = 3000;
-        PetecoPeteco.BangBangBalls(rpm);
-        PetecoPeteco.tryToLauch(rpm);
-       } 
-     }
+  /* ===========================
+        CONTROLE DO TRANSPORT
+     =========================== */
+  private void controleDoTransporte() {
+    double rt = joy.getRawAxis(Constants.RT);
+    double lt = joy.getRawAxis(Constants.LT);
 
-    public void buttonXgetPressed(){
-      if (joyDelicioso.getRawButtonPressed(Constants.x)){
-        Xpressed = true;
-        YPressed = false;
-        PetecoPeteco.autoShooter();
-        }
-    }
-
-
-  public void StopBraceta(){
-    if (joyDelicioso.getRawButtonPressed(Constants.b)){
-      ParouOBracin = !ParouOBracin;
-   PetecoPeteco.StopBraceta();
-    YPressed = false; // Cancela o modo PID
-    Xpressed = false; // Cancela o modo PID
+    if (rt > 0.5) {
+      shooter.PuxarOsCoiso();
+    } 
+    else if (lt > 0.5) {
+      shooter.LargarOsCoiso();
+    } 
+    else {
+      shooter.RodaColetorMotor.set(0);
     }
   }
 
-  
+  /* ===========================
+        CONTROLE DO SHOOTER
+     =========================== */
+  private void controleShooter() {
+
+    // Se travou o braceta → nada funciona
+    if (bracetaTravado) {
+      shooter.StopShooter();
+      return;
+    }
+
+    // MODO Y → BangBang fixo
+    if (yMode) {
+      double rpm = 1000;
+      shooter.BangBangBalls(rpm);
+      shooter.tryToLauch(rpm);
+      return;
+    }
+
+    // MODO X → Auto shooter com visão
+    if (xMode) {
+      shooter.autoShooter();
+      return;
+    }
+
+    // Se não está em nenhum modo, para
+    shooter.StopShooter();
+  }
+
+/*  ========================== 
+           EXECUTE           
+  ========================== */
   @Override
   public void execute() {
-    joyDelicioso.getRawButton(Constants.RB);
-    joyDelicioso.getRawButton(Constants.LB);
-    joyDelicioso.getRawAxis(Constants.RT);
-    joyDelicioso.getRawAxis(Constants.LT);
-    joyDelicioso.getRawButton(Constants.y);
-    joyDelicioso.getRawButton(Constants.b);
-    joyDelicioso.getRawButton(Constants.x);
 
+    // 1) Lê botões e atualiza modos
+    handleModeButtons();
 
-   ButtonYgetPressed();
-   buttonXgetPressed();
-   StopBraceta();
-   
-   if (Xpressed || YPressed){
-    MexerComPIDSLK();
-   } else {
-   mexerBracinSlk();
-   mexerIntakeSlk();
-   }
-   PerseguirEAtirar();
+    // 2) Controle do intake
+    controleIntake();
 
-   SmartDashboard.putNumber("velocidade Bang",PetecoPeteco.JogaOsCoisoMotor.getAppliedOutput());
-   SmartDashboard.putNumber("velocidade Coleta",PetecoPeteco.PegaOsCoisoMotor.getAppliedOutput());
-   SmartDashboard.putBoolean("Button Y", joyDelicioso.getRawButton(Constants.y));
-   SmartDashboard.putBoolean("Y Pressed", YPressed);
+    // 3) Controle do transporte
+    controleDoTransporte();
+
+    // 4) Controle completo do shooter
+    controleShooter();
+
+    // 5) Dashboard pra debug
+    SmartDashboard.putNumber("BangUp Out", shooter.MotorUp.getAppliedOutput());
+   // SmartDashboard.putNumber("BangDown Out", shooter.MotorDown.getAppliedOutput());
+    SmartDashboard.putNumber("Coletor Out", shooter.PegaOsCoisoMotor.getAppliedOutput());
+    SmartDashboard.putNumber("Transport Out", shooter.LevarPraTacarOsCoiso.getAppliedOutput());
+    SmartDashboard.putBoolean("Y Mode", yMode);
+    SmartDashboard.putBoolean("X Mode", xMode);
+    SmartDashboard.putBoolean("Travado", bracetaTravado);
   }
-
-
-  @Override
-  public void end(boolean interrupted) {
-  }
-
 
   @Override
   public boolean isFinished() {

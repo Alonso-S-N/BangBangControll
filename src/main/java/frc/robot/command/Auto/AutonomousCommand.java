@@ -1,10 +1,13 @@
 package frc.robot.command.Auto;
+import com.google.flatbuffers.ShortVector;
+
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants;
 import frc.robot.SubSystem.Drive;
 import frc.robot.SubSystem.Vision;
+import frc.robot.SubSystem.BangBangSub;
 
 
 public class AutonomousCommand extends Command {
@@ -14,6 +17,7 @@ public class AutonomousCommand extends Command {
   private final Drive drive;
   private final Vision vision;
   private final double targetArea;
+  private final BangBangSub shooter;
   private boolean finished;
   public double RightSpeed;
 
@@ -23,11 +27,13 @@ public class AutonomousCommand extends Command {
   private final double hysteresis = 0.5; 
   private boolean holdingPosition = false;
 
-  public AutonomousCommand(Drive drive, Vision vision, double targetArea) {
+  public AutonomousCommand(Drive drive, Vision vision, double targetArea,BangBangSub shooter) {
       this.drive = drive;
       this.vision = vision;
+      this.shooter = shooter;
       this.targetArea = targetArea;
-      addRequirements(drive,vision);
+
+      addRequirements(drive,vision,shooter);
   }
 
   @Override
@@ -57,6 +63,7 @@ public class AutonomousCommand extends Command {
 
           case segurando:
               setDriveSpeeds(0, 0);
+              shooter.autoShooter();
              System.out.println("segurando"); 
               break;
       }
@@ -79,9 +86,9 @@ public class AutonomousCommand extends Command {
       }
 
       if (t < 2.0) {
-          setDriveSpeeds(-0.2, 0.2); 
+          setDriveSpeeds(-0.3, 0.3); 
       } else if (t < 4.0) {
-          setDriveSpeeds(0.2, -0.2); 
+          setDriveSpeeds(0.3, -0.3); 
       } else {
           setDriveSpeeds(0, 0); 
           state = State.segurando;
@@ -102,7 +109,7 @@ public class AutonomousCommand extends Command {
       double kP_forward = 0.1;
 
       double turn = tx * kP_turn; 
-      double forward = (targetArea - ta) * kP_forward;
+      double forward = -(targetArea - ta) * kP_forward;
 
       forward = Math.max(-0.5, Math.min(0.5, forward));
 

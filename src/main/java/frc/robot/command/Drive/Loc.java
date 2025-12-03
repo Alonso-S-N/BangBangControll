@@ -2,10 +2,13 @@ package frc.robot.command.Drive;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.RamseteCommand;
 import frc.robot.Constants;
 import frc.robot.SubSystem.BangBangSub;
 import frc.robot.SubSystem.Drive;
 import frc.robot.SubSystem.ObjectSim;
+import frc.robot.SubSystem.TrajectoryFollower;
 import frc.robot.SubSystem.Vision;
 import frc.robot.command.Auto.AutonomousCommand;
 import frc.robot.Calcs;
@@ -19,17 +22,31 @@ public class Loc extends Command {
   private final BangBangSub baby;
   private final Vision vision;
   DriveSpeeds speeds;
+  private final TrajectoryFollower traj;
   
     private double B_Speed = 0;
     private boolean a, b, x, a2;
     private boolean joyDeliciosoA2Pressed;
     private double POV;
 
+    public enum DriveMode {
+      MANUAL,
+      VISION,
+      POV,
+      TRAJECTORY,
+      VISION_C,
+      VISION_A,
+      VISION_CA,
+      STOPPED
+  }  
+
+  private DriveMode currentMode = DriveMode.STOPPED;
     
   
-    public Loc(Drive driveSubsystem,Joystick joyDeliciu,BangBangSub baby,Vision vision,Joystick joyDelicioso) {
+    public Loc(Drive driveSubsystem,Joystick joyDeliciu,BangBangSub baby,Vision vision,Joystick joyDelicioso,TrajectoryFollower traj) {
       this.driveSubsystem = driveSubsystem;
       this.vision = vision;
+      this.traj = traj;
       this.joyDelicioso = joyDelicioso;
       this.joyDeliciu = joyDeliciu;
       this.baby = baby;
@@ -51,10 +68,14 @@ public class Loc extends Command {
   }
 
 private void setDriveSpeeds(double left, double right) {
-    if (speeds != null) {
         driveSubsystem.rawTank(left, right);
-    } else {
-    }
+}
+
+private void setMode(DriveMode mode) {
+  if (mode != currentMode) {
+      System.out.println("Mudando DriveMode para: " + mode);
+      currentMode = mode;
+  }
 }
 
   private void stopDrive() {
@@ -88,32 +109,94 @@ private void setDriveSpeeds(double left, double right) {
   }
 
   public void MainControl() {
-    double X = joyDeliciu.getX();
-    double Y = joyDeliciu.getY();
+
+    double X  = joyDeliciu.getX();
+    double Y  = joyDeliciu.getY();
     double X1 = joyDeliciu.getRawAxis(Constants.X1);
     double Y2 = joyDeliciu.getRawAxis(Constants.Y2);
-   
+
+    // ----- TRAJETÓRIA -----//
+    if (joyDelicioso.getPOV() == 0) {
+        setMode(DriveMode.TRAJECTORY);
+
+        CommandScheduler.getInstance().schedule(
+            traj.followTrajectoryCommand()
+            .andThen(() -> currentMode = DriveMode.STOPPED)
+        );
+
+        speeds = null;  // Loc NÃO controla os motores
+        return;
+    }
+
+    // ----- VISÃO -----//
+    if (joyDeliciosoA2Pressed) {
+        setMode(DriveMode.VISION);
+
+        vision.Perseguir();
+        speeds = new DriveSpeeds(vision.LeftSpeed, vision.RightSpeed);
+
+        setDriveSpeeds(speeds.left, speeds.right);
+        return;
+    }
+    // ----- VISÃO CORAL-----//
+     if (joyDelicioso.getPOV() == 90) {
+        setMode(DriveMode.VISION_C);
+
+        vision.perseguirCoral();
+        speeds = new DriveSpeeds(vision.LeftSpeed, vision.RightSpeed);
+
+        setDriveSpeeds(speeds.left, speeds.right);
+        return;
+     }
+      // ----- VISÃO ALGAE-----//
+      if (joyDelicioso.getPOV() == 270) {
+          setMode(DriveMode.VISION_A);
   
-    if (joyDeliciu.getPOV() != Constants.povDeadZone){
-      speeds = Calcs.calculatePovDrive(joyDeliciu, B_Speed);
+          vision.perseguirAlgae();
+          speeds = new DriveSpeeds(vision.LeftSpeed, vision.RightSpeed);
+  
+          setDriveSpeeds(speeds.left, speeds.right);
+          return;
+      }
+
+      // ----- VISÃO Cargo -----//
+      if (joyDelicioso.getPOV() == 180) {
+          setMode(DriveMode.VISION_CA);
+  
+          vision.perseguirCargo();
+          speeds = new DriveSpeeds(vision.LeftSpeed, vision.RightSpeed);
+  
+          setDriveSpeeds(speeds.left, speeds.right);
+          return;
+      }
+    // ----- POV DRIVE -----//
+    if (joyDeliciu.getPOV() != Constants.povDeadZone) {
+        setMode(DriveMode.POV);
+
+        speeds = Calcs.calculatePovDrive(joyDeliciu, B_Speed);
+        setDriveSpeeds(speeds.left, speeds.right);
+        return;
     }
-    else if (Math.abs(X) >= Constants.deadZone || Math.abs(Y) >= Constants.deadZone || Math.abs(X) < Constants.NegativeDeadZone || Math.abs(Y) < Constants.NegativeDeadZone) {
-      speeds = Calcs.calculateAnalogDrive(joyDeliciu, B_Speed); 
+
+    // ----- ANALÓGICO NORMAL -----//
+    if (Math.abs(X)  >= Constants.deadZone ||
+        Math.abs(Y)  >= Constants.deadZone ||
+        Math.abs(X1) >= Constants.deadZone ||
+        Math.abs(Y2) >= Constants.deadZone) {
+
+        setMode(DriveMode.MANUAL);
+
+        speeds = Calcs.calculateAnalogDrive(joyDeliciu, B_Speed);
+        setDriveSpeeds(speeds.left, speeds.right);
+        return;
     }
-      else if (Math.abs(X1) >= Constants.deadZone || Math.abs(Y2) >= Constants.deadZone || Math.abs(X1) < Constants.NegativeDeadZone || Math.abs(Y2) < Constants.NegativeDeadZone){
-       speeds = Calcs.calculateAnalogDrive2(joyDeliciu,B_Speed);
-    } else if (joyDeliciosoA2Pressed){
-     vision.Perseguir();
-     speeds = new DriveSpeeds(vision.LeftSpeed, vision.RightSpeed);
-    } else {
-      stopDrive();
-      speeds = null;
-       return;
-    }
-    if (speeds != null){
-    setDriveSpeeds(speeds.left, speeds.right);
-    }
-  }
+
+    // ----- NINGUÉM CONTROLANDO ----- //
+    setMode(DriveMode.STOPPED);
+    stopDrive();
+    speeds = null;
+}
+
 
 
   public void Smart(){
