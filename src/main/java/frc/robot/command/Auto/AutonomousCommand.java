@@ -11,7 +11,7 @@ import frc.robot.SubSystem.BangBangSub;
 
 
 public class AutonomousCommand extends Command {
-  private enum State { procurando,seguindo,segurando }
+  public enum State { Auto1,Auto2,Auto3,Auto4}
   private State state;
 
   private final Drive drive;
@@ -27,12 +27,12 @@ public class AutonomousCommand extends Command {
   private final double hysteresis = 0.5; 
   private boolean holdingPosition = false;
 
-  public AutonomousCommand(Drive drive, Vision vision, double targetArea,BangBangSub shooter) {
+  public AutonomousCommand(Drive drive, Vision vision, double targetArea,BangBangSub shooter,State selectedState) {
       this.drive = drive;
       this.vision = vision;
       this.shooter = shooter;
       this.targetArea = targetArea;
-
+        this.state = selectedState;
       addRequirements(drive,vision,shooter);
   }
 
@@ -44,91 +44,31 @@ public class AutonomousCommand extends Command {
       timer.start();
       finished = false;
       holdingPosition = false;
-      state = State.procurando;
+    
   }
 
   @Override
   public void execute() {
         Smart();
-      switch (state) {
-          case procurando:
-              runSearch();
-            System.out.println("Procurando");
-              break;
+        switch (state) {
+            case Auto1:
+             vision.Perseguir();
+                break;
 
-          case seguindo:
-              runTrack();
-             System.out.println("seguindo"); 
-              break;
+            case Auto2:
+            vision.perseguirAlgae();
+                break;
 
-          case segurando:
-              setDriveSpeeds(0, 0);
-              shooter.autoShooter();
-             System.out.println("segurando"); 
-              break;
-      }
+            case Auto3:
+            vision.perseguirCoral();
+                break;
+            case Auto4:
+            vision.perseguirCargo();
+                break;
 
-      if (timer.get() >= Constants.autonomousTime) {
-          finished = true;
-      }
-
-      if (drive.driveSim != null) {
-          drive.simulationPeriodic();
-      }
+        }
   }
 
-  private void runSearch() {
-      double t = timer.get();
-
-      if (vision.hasTarget()) {
-          state = State.seguindo;
-          return;
-      }
-
-      if (t < 2.0) {
-          setDriveSpeeds(-0.3, 0.3); 
-      } else if (t < 4.0) {
-          setDriveSpeeds(0.3, -0.3); 
-      } else {
-          setDriveSpeeds(0, 0); 
-          state = State.segurando;
-      }
-  }
-
-  private void runTrack() {
-      if (!vision.hasTarget()) {
-         
-          state = State.procurando;
-          return;
-      }
-
-      double tx = vision.getTx();
-      double ta = vision.getTa();
-      
-      double kP_turn = 0.03;
-      double kP_forward = 0.1;
-
-      double turn = tx * kP_turn; 
-      double forward = -(targetArea - ta) * kP_forward;
-
-      forward = Math.max(-0.5, Math.min(0.5, forward));
-
-      double left = forward + turn;
-      double right = forward - turn;
-
-      left = Math.max(-0.5, Math.min(0.5, left));
-      right = Math.max(-0.5, Math.min(0.5, right));
-
-      RightSpeed = right;
-      LeftSpeed = left;
-
-      if (ta >= (targetArea - hysteresis)) {
-          state = State.segurando; 
-          setDriveSpeeds(0, 0);
-      } else {
-          setDriveSpeeds(left, right);
-      }
-  }
 
   @Override
   public boolean isFinished() {

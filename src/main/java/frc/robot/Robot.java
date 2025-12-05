@@ -42,6 +42,7 @@ public class Robot extends LoggedRobot {
   @Override
   public void robotInit() {
     m_robotContainer = new RobotContainer();
+     m_robotContainer.configAuto();
      m_autonomousCommand = m_robotContainer.getAutonomousCommand();
      BracetaCommand = m_robotContainer.getBracinCommand();
      Logger.recordMetadata("ProjectName", "Binga"); 

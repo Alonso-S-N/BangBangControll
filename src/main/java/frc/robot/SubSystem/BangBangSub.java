@@ -91,17 +91,17 @@ public class BangBangSub extends SubsystemBase {
     this.drive = drive;
     this.objectSim = objectSim;
 
-    ShooterEncoder.setDistancePerPulse((1.0 / 2048.0) * 60.0); // Converte para RPM
+    ShooterEncoder.setDistancePerPulse(60.0 / (2048.0 * 4.0));
 
     final  SparkMaxConfig kCoast = new SparkMaxConfig();
     kCoast.idleMode(SparkBaseConfig.IdleMode.kCoast);
-    kCoast.openLoopRampRate(1.0);
+    //kCoast.openLoopRampRate(1.0);
     controller.setTolerance(50);
     final SparkMaxConfig Kbrake = new SparkMaxConfig();
     Kbrake.idleMode(SparkBaseConfig.IdleMode.kBrake);
     Kbrake.openLoopRampRate(0.4);
 
-    ShooterEncoder.setReverseDirection(true);
+    ShooterEncoder.setReverseDirection(false);
   /* ============================== Motores ========================================*/
     RodaColetorMotor.configure(kCoast,ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
     MotorUp.configure(kCoast,ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
@@ -121,12 +121,12 @@ public class BangBangSub extends SubsystemBase {
   public void BangBangBalls(double setpoint){
     double RPM = ShooterEncoder.getRate();
     double output = controller.calculate(RPM, setpoint);
-    MotorDown.set(output);
-    MotorUp.set(output);
+    MotorDown.set(-output);
+    MotorUp.set(-output);
     System.out.println("Rpm Encoder" + ShooterEncoder.getRate());
 
     if (Math.abs(RPM- setpoint) < 50.0) {
-      LevarPraTacarOsCoiso.set(0.5);
+      LevarPraTacarOsCoiso.set(-1.0);
     } else {
       stopLevarOsCoiso();
     }
@@ -161,12 +161,12 @@ public class BangBangSub extends SubsystemBase {
     
         double output = controller.calculate(currentRPM, setpointRPM);
     
-        MotorUp.set(output);
-        MotorDown.set(output);
+        MotorUp.set(-output);
+        MotorDown.set(-output);
     
         // 5. Quando o RPM estiver ok, alimenta a bola
         if (!shotFinished && Math.abs(currentRPM - setpointRPM) < 50.0) {
-            LevarPraTacarOsCoiso.set(-0.5);
+            LevarPraTacarOsCoiso.set(-1.0);
             tryToLauch(setpointRPM);
         } else {
             stopLevarOsCoiso();

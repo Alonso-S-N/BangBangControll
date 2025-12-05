@@ -11,10 +11,15 @@ import frc.robot.SubSystem.TrajectoryFollower;
 import frc.robot.SubSystem.Vision;
 import frc.robot.SubSystem.BangBangSub;
 import frc.robot.command.Auto.AutonomousCommand;
+import frc.robot.command.Auto.AutonomousCommand.State;
 import frc.robot.command.Drive.Loc;
 import frc.robot.command.Drive.BangBangCommand;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class RobotContainer {
+
+  private final SendableChooser<Command> autoChooser = new SendableChooser<>();
 
   // Subsystems
   private final ObjectSim object = new ObjectSim("ObjectSim");
@@ -44,7 +49,7 @@ public class RobotContainer {
     CommandScheduler.getInstance().registerSubsystem(driveSubsystem);
 
     // Initialize Loc command with drive subsystem and joystick
-    auto = new AutonomousCommand(driveSubsystem,vision,Constants.targetArea,baby);
+    auto = new AutonomousCommand(driveSubsystem,vision,Constants.targetArea,baby,State.Auto1);
 
     locCommand = new Loc(driveSubsystem,joyDeliciu,baby,vision,JoyDelicioso,traj);
 
@@ -55,10 +60,31 @@ public class RobotContainer {
 
   }
 
-  public Command getAutonomousCommand(){
-      return auto;
+    public void configAuto() {
+
+      autoChooser.setDefaultOption(
+          "Autônomo 1",
+          new AutonomousCommand(driveSubsystem, vision, Constants.targetArea, baby, State.Auto1)
+      );
+      autoChooser.addOption(
+          "Autônomo 2",
+          new AutonomousCommand(driveSubsystem, vision, Constants.targetArea, baby, State.Auto2)
+      );
+      autoChooser.addOption(
+          "Autônomo 3",
+          new AutonomousCommand(driveSubsystem, vision, Constants.targetArea, baby, State.Auto3)
+      );
+      autoChooser.addOption(
+          "Autônomo 4",
+          new AutonomousCommand(driveSubsystem, vision, Constants.targetArea, baby, State.Auto4)
+      );
   
+      SmartDashboard.putData("Modo Autônomo", autoChooser);
   }
+
+  public Command getAutonomousCommand() {
+    return autoChooser.getSelected();
+}
 
   public Command getBracinCommand(){
     return Pdiddy;
