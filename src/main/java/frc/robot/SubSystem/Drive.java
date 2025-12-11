@@ -6,6 +6,7 @@
 
 import frc.robot.Calcs.DriveSpeeds;
 import frc.robot.Constants;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
@@ -38,6 +39,11 @@ import org.ironmaple.simulation.seasonspecific.reefscape2025.ReefscapeCoralOnFie
 
 import org.littletonrobotics.junction.Logger;
 
+//"Ah, vontade de comer um docinho"
+//"- Diz o Deliciu"
+//"Docinho? Tô mais pra um delicioso"
+// copilot 2025 //
+
 
   public class Drive extends SubsystemBase {
     private final Field2d field = new Field2d();
@@ -55,7 +61,7 @@ import org.littletonrobotics.junction.Logger;
     new DifferentialDriveKinematics(kTrackwidthMeters); 
 
     public final SimpleMotorFeedforward m_feedforward = 
-    new SimpleMotorFeedforward(0.18, 2.7, 0.4); // Valores de Exemplo (TESTAR!!!!!)
+    new SimpleMotorFeedforward(0.18, 0.7, 0.4); // Valores de Exemplo (TESTAR!!!!!)
     public final PIDController m_leftController = new PIDController(0.008, 0.0, 0.0);
     public final PIDController m_rightController = new PIDController(0.008, 0.0, 0.0);
     private final  Arena2025Reefscape arena = new Arena2025Reefscape();
@@ -68,8 +74,8 @@ import org.littletonrobotics.junction.Logger;
     private final WPI_VictorSPX m_leftFollower  = new WPI_VictorSPX(Constants.LMot2);
     private final WPI_VictorSPX m_rightFollower = new WPI_VictorSPX(Constants.RMot2);
     
-    public final Encoder leftEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X);
-    public final Encoder rightEncoder = new Encoder(6, 7, true, Encoder.EncodingType.k4X);
+    public final Encoder leftEncoder = new Encoder(3, 4, false, Encoder.EncodingType.k4X);
+    public final Encoder rightEncoder = new Encoder(5, 6, true, Encoder.EncodingType.k4X);
     private final ADXRS450_Gyro gyro = new ADXRS450_Gyro();
     private BangBangSub braceta = null;
     private ObjectSim object;
@@ -270,13 +276,16 @@ import org.littletonrobotics.junction.Logger;
       // 3) Soma final -> voltagem real enviada ao motor
       double leftVolts = leftFF + leftPID;
       double rightVolts = rightFF + rightPID;
+
+      MathUtil.clamp(leftVolts, -4, 4);
+      MathUtil.clamp(rightVolts, -4, 4);
   
       simLeftVolts = leftVolts;
       simRightVolts = rightVolts;
 
       m_leftLeader.setVoltage(leftVolts);
       m_rightLeader.setVoltage(rightVolts);
-
+    
       return new DriveSpeeds(leftVolts/12, rightVolts/12);
 
   }

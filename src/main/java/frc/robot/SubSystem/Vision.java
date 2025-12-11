@@ -47,10 +47,12 @@ public class Vision extends SubsystemBase {
         private boolean tv;
         private final double targetArea;
   private boolean finished;
-  private int [] validIds = {1,18};
+  private int [] validIds = {0,1,18};
   public double RightSpeed;
   public LimelightHelpers.PoseEstimate mt2;
   public double DistanceTolerance = 0.2;
+  private boolean isAlignedAndLocked = false;
+  public double lastValidTx = 0.0;
 
   private Drive drive;
   
@@ -75,6 +77,8 @@ public class Vision extends SubsystemBase {
                 drive.getPose();
                 finished = false;
                 holdingPosition = false;
+                isAlignedAndLocked = false;
+                lastValidTx = 0.0;
                 camera = new PhotonCamera("camera");
 
 limelight = NetworkTableInstance.getDefault().getTable("limelight-front");
@@ -158,10 +162,19 @@ if (RobotBase.isSimulation()) {
             SmartDashboard.putNumber("Limelight TA", getTa());
 
          
-      }  
+      } 
+      
+      public boolean isLocked() {
+        return isAlignedAndLocked;
+    }
+
+      public void Resetalighted() {
+        isAlignedAndLocked = false;
+      }
+
       public DriveSpeeds perseguirCargo(){
         timer.start();
-          if (DistanceCa() != 0){
+          if (DistanceCa() != 0){ 
             double currentDistance = DistanceCa();
             getAITXCA();
             double kP_turn = 0.03;
@@ -291,7 +304,52 @@ if (RobotBase.isSimulation()) {
       }
   
 
-   
+      public boolean alignWithTag_P() {
+        boolean currentlyAligned = false;
+    
+        if (hasTarget()) {
+            double tx = getTx();
+            double deadbandDeg = 2.5;
+            double kP = 0.03;
+            double maxTurn = 0.3;
+            double minTurn = 0.1;
+    
+            if (Math.abs(tx) <= deadbandDeg) {
+                // Alinhado no momento (com visão)
+                setDriveSpeeds(0.0, 0.0);
+                currentlyAligned = true;
+                isAlignedAndLocked = true; // Trava o estado de alinhamento
+                lastValidTx = tx; // O tx neste ponto é praticamente zero
+            } else {
+                // Alinhando
+                isAlignedAndLocked = false; // Desbloqueia enquanto estiver ajustando
+                lastValidTx = tx;
+    
+                double turn = -kP * tx;
+                turn = Math.max(-maxTurn, Math.min(maxTurn, turn));
+                if (Math.abs(turn) < minTurn) {
+                    turn = Math.copySign(minTurn, turn);
+                }
+    
+                double left = -turn;
+                double right = turn;
+                setDriveSpeeds(left, right);
+            }
+        } else {
+            // Alvo perdido
+            if (isAlignedAndLocked) {
+                // Se estava alinhado, mantem a posição (velocidade zero)
+                setDriveSpeeds(0.0, 0.0);
+                currentlyAligned = true; // Considera alinhado para continuar o processo
+            } else {
+                // Se perdeu o alvo e não estava alinhado, não pode continuar
+                setDriveSpeeds(0.0, 0.0);
+                currentlyAligned = false;
+            }
+        }
+        
+        return currentlyAligned;
+    } 
         public DriveSpeeds Perseguir(){
           timer.start();
           if (hasTarget()) {

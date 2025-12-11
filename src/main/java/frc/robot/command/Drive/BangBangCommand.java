@@ -95,6 +95,9 @@ public class BangBangCommand extends Command {
     // Se travou o braceta → nada funciona
     if (bracetaTravado) {
       shooter.StopShooter();
+      shooter.stopLevarOsCoiso();
+      shooter.ResetPetecoPeteco();
+      shooter.stopExtensor();
       return;
     }
 
@@ -142,6 +145,7 @@ public class BangBangCommand extends Command {
     SmartDashboard.putBoolean("Y Mode", yMode);
     SmartDashboard.putBoolean("X Mode", xMode);
     SmartDashboard.putBoolean("Travado", bracetaTravado);
+    SmartDashboard.putBoolean("HasLocked", vision.isLocked());
   }
 
   @Override

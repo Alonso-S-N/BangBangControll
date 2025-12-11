@@ -29,7 +29,7 @@ public class TrajectoryFollower extends SubsystemBase {
 
    
     
-    TrajectoryConfig config = new TrajectoryConfig(1.5, 1.0);
+    TrajectoryConfig config = new TrajectoryConfig(0.3, 0.3);
 
     var PontoDePartida = drive.getPose();
 
